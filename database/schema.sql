@@ -1,13 +1,13 @@
-CREATE TABLE User_Theatre (
+CREATE TABLE IF NOT EXISTS User_Theatre (
     id serial PRIMARY KEY,
     first_name text NOT NULL CHECK (length(trim(first_name)) > 0),
     last_name text NOT NULL CHECK (length(trim(last_name)) > 0),
-    email text NOT NULL UNIQUE,
+    email text NOT NULL UNIQUE CHECK (length(trim(email)) > 0),
     passport_data varchar(11) NOT NULL UNIQUE,
     password_hash text NOT NULL
 );
 
-CREATE TABLE Performance (
+CREATE TABLE IF NOT EXISTS Performance (
     id serial PRIMARY KEY,
     title varchar(255) NOT NULL CHECK (length(trim(title)) > 0),
     description text,
@@ -18,7 +18,7 @@ CREATE TABLE Performance (
 
 CREATE TYPE ticket_status AS ENUM ('booked', 'paid', 'canceled');
 
-CREATE TABLE Ticket (
+CREATE TABLE IF NOT EXISTS Ticket (
     id serial PRIMARY KEY,
     user_id int REFERENCES User_Theatre(id) ON DELETE RESTRICT,
     performance_id int NOT NULL REFERENCES Performance(id) ON DELETE CASCADE,
@@ -28,6 +28,6 @@ CREATE TABLE Ticket (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX tickets_active_seat_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS tickets_active_seat_uniq
     ON Ticket (performance_id, row_number, seat_number)
     WHERE status IN ('booked', 'paid');
