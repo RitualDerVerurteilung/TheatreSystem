@@ -8,7 +8,6 @@ public class Performance {
     int duration;
     double price;
 
-
     public void setId(int id) { this.id = id; }
     public int getId() {
         return id;
