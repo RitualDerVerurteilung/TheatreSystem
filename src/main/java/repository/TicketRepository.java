@@ -23,8 +23,23 @@ public interface TicketRepository {
             int userId
     ) throws SQLException;
 
+    List<Ticket> findAllSortedByStatus(
+            int userId,
+            boolean ascending
+    ) throws SQLException;
+
     List<Ticket> findAllSortedByDate(
             int userId
+    ) throws SQLException;
+
+    List<Ticket> findAllSortedByDate(
+            int userId,
+            boolean ascending
+    ) throws SQLException;
+
+    List<Ticket> findByPerformanceTitle(
+            int userId,
+            String performanceTitle
     ) throws SQLException;
 
     Optional<Ticket> findById(
