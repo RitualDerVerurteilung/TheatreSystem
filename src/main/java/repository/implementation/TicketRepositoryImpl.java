@@ -495,11 +495,7 @@ public class TicketRepositoryImpl implements TicketRepository {
 
                     int ticketId = resultSet.getInt("id");
 
-                    // После создания билета снова получаем его через findById.
-                    // Благодаря JOIN Performance результат будет содержать
-                    // название спектакля, а не performance_id.
-                    Optional<Ticket> ticket =
-                            findById(ticketId, userId);
+                    Optional<Ticket> ticket = findById(ticketId, userId);
 
                     if (ticket.isPresent()) {
                         return ticket.get();
@@ -511,7 +507,6 @@ public class TicketRepositoryImpl implements TicketRepository {
         } catch (SQLException e) {
 
             // Код 23505 — нарушение UNIQUE-ограничения PostgreSQL.
-            // В нашей БД это может произойти, если место уже занято.
             if ("23505".equals(e.getSQLState())) {
                 throw new SQLException(
                         "Это место уже занято",
@@ -526,68 +521,8 @@ public class TicketRepositoryImpl implements TicketRepository {
     }
 
 
-    // Аннотация @Override метод класса переопределяет метод интерфейса.
-    // Метод создаёт матрицу мест конкретного спектакля.
-    // 0 — место свободно.
-    // 1 — место занято.
-    @Override
-    public int[][] getSeats(int performanceId)
-            throws SQLException {
-
-        // SQL-запрос получает занятые места конкретного спектакля.
-        // Берутся только забронированные и оплаченные билеты.
-        String sql = """
-            SELECT row_number,
-                   seat_number
-            FROM Ticket
-            WHERE performance_id = ?
-              AND status IN ('booked', 'paid')
-            ORDER BY row_number, seat_number
-            """;
-
-        // Создание матрицы зала.
-        // 15 — количество рядов.
-        // 20 — количество мест в каждом ряду.
-        int[][] seats = new int[15][20];
-
-        // Connection устанавливает соединение с БД
-        // PreparedStatement — предварительно скомпилированный SQL-запрос
-        try (Connection connection = databaseManager.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            // В первый ? установить id спектакля
-            statement.setInt(1, performanceId);
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-
-                // Переход по всем найденным занятым местам.
-                while (resultSet.next()) {
-
-                    // Получение номера ряда из БД.
-                    int row =
-                            resultSet.getInt("row_number");
-
-                    // Получение номера места из БД.
-                    int seat =
-                            resultSet.getInt("seat_number");
-
-                    // В Java массив начинается с индекса 0.
-                    // Поэтому из номера ряда и места вычитается 1.
-                    // 1 — занятое место.
-                    seats[row - 1][seat - 1] = 1;
-                }
-            }
-        }
-
-        // Возвращение готовой матрицы мест.
-        return seats;
-    }
-
-
     // Метод выполняет переданный SQL-запрос
     // и преобразует найденные строки в список Ticket.
-    // Используется несколькими методами класса,
-    // чтобы не повторять одинаковый код подключения к БД.
     private List<Ticket> executeTicketListQuery(
             String sql,
             int userId
@@ -621,40 +556,19 @@ public class TicketRepositoryImpl implements TicketRepository {
 
         Ticket ticket = new Ticket();
 
-        ticket.setId(
-                resultSet.getInt("id")
-        );
+        ticket.setId( resultSet.getInt("id") );
 
-        ticket.setUserId(
-                resultSet.getInt("user_id")
-        );
+        ticket.setUserId( resultSet.getInt("user_id") );
 
-        // Получение названия спектакля.
-        // В SQL оно было получено через:
-        // p.title AS performance_title
-        ticket.setPerformanceTitle(
-                resultSet.getString("performance_title")
-        );
+        ticket.setPerformanceTitle( resultSet.getString("performance_title") );
 
-        ticket.setRowNumber(
-                resultSet.getInt("row_number")
-        );
+        ticket.setRowNumber( resultSet.getInt("row_number"));
 
-        ticket.setSeatNumber(
-                resultSet.getInt("seat_number")
-        );
+        ticket.setSeatNumber( resultSet.getInt("seat_number") );
 
-        ticket.setStatus(
-                TicketStatus.valueOf(
-                        resultSet
-                                .getString("status")
-                                .toUpperCase()
-                )
-        );
+        ticket.setStatus(TicketStatus.valueOf(resultSet.getString("status").toUpperCase()));
 
-        ticket.setCreatedAt(
-                resultSet.getString("created_at")
-        );
+        ticket.setCreatedAt(resultSet.getString("created_at"));
 
         return ticket;
     }

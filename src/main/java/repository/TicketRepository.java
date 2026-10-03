@@ -64,8 +64,4 @@ public interface TicketRepository {
             int rowNumber,
             int seatNumber
     ) throws SQLException;
-
-    int[][] getSeats(
-            int performanceId
-    ) throws SQLException;
 }
