@@ -10,44 +10,62 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+// implements — класс TicketRepositoryImpl реализует интерфейс TicketRepository
 public class TicketRepositoryImpl implements TicketRepository {
 
+    // final — после присваивания значения поле нельзя заменить
+    // т.е. один раз передаётся объект подключения
     private final DatabaseManager databaseManager;
 
+    // Конструктор
     public TicketRepositoryImpl(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public List<Ticket> findByTicketStatus(
             int userId,
             TicketStatus status
     ) throws SQLException {
 
+        // ? — плейсхолдер
+        // ?:: — преобразовать переданное значение в тип enum ticket_status
         String sql = """
-            SELECT id,
-                   user_id,
-                   performance_id,
-                   row_number,
-                   seat_number,
-                   status,
-                   created_at
-            FROM Ticket
-            WHERE user_id = ?
-              AND status = ?::ticket_status
-            ORDER BY created_at DESC
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.user_id = ?
+              AND t.status = ?::ticket_status
+            ORDER BY t.created_at DESC
             """;
 
         List<Ticket> tickets = new ArrayList<>();
 
+        // Подключение к БД
+        // try-with-resource
+        // statement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
+            // В первый ? установить значение id пользователя
             statement.setInt(1, userId);
+
+            // Во второй ? установить статус билета
             statement.setString(2, statusToDatabase(status));
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
+                // Добавление билета в список
+                // Вызов next() перемещает указатель на следующую строку
                 while (resultSet.next()) {
                     tickets.add(mapTicket(resultSet));
                 }
@@ -57,20 +75,25 @@ public class TicketRepositoryImpl implements TicketRepository {
         return tickets;
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public List<Ticket> findByPerformanceStatus(
             int userId,
             String performanceStatus
     ) throws SQLException {
 
+        // Объявление запроса
         String sql;
 
+        // SQL запрос для спектаклей, которые ещё не завершились.
+        // Равен ли performanceStatus строке "upcoming" без учёта регистра?
         if ("upcoming".equalsIgnoreCase(performanceStatus)) {
 
             sql = """
                 SELECT t.id,
                        t.user_id,
-                       t.performance_id,
+                       p.title AS performance_title,
                        t.row_number,
                        t.seat_number,
                        t.status,
@@ -87,10 +110,11 @@ public class TicketRepositoryImpl implements TicketRepository {
 
         } else if ("finished".equalsIgnoreCase(performanceStatus)) {
 
+            // SQL запрос для спектаклей, которые уже завершились.
             sql = """
                 SELECT t.id,
                        t.user_id,
-                       t.performance_id,
+                       p.title AS performance_title,
                        t.row_number,
                        t.seat_number,
                        t.status,
@@ -106,6 +130,9 @@ public class TicketRepositoryImpl implements TicketRepository {
                 """;
 
         } else {
+
+            // Если передан неизвестный статус спектакля,
+            // выбрасывается ошибка.
             throw new IllegalArgumentException(
                     "Неизвестный статус спектакля: " + performanceStatus
             );
@@ -114,32 +141,83 @@ public class TicketRepositoryImpl implements TicketRepository {
         return executeTicketListQuery(sql, userId);
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод возвращает билеты, отсортированные по статусу.
+    // Сортировка по умолчанию:
+    // paid -> booked -> canceled
     @Override
     public List<Ticket> findAllSortedByStatus(int userId)
             throws SQLException {
 
         String sql = """
-            SELECT id,
-                   user_id,
-                   performance_id,
-                   row_number,
-                   seat_number,
-                   status,
-                   created_at
-            FROM Ticket
-            WHERE user_id = ?
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.user_id = ?
             ORDER BY
-                CASE status
+                CASE t.status
                     WHEN 'paid' THEN 1
                     WHEN 'booked' THEN 2
                     WHEN 'canceled' THEN 3
                 END,
-                created_at DESC
+                t.created_at DESC
             """;
 
         return executeTicketListQuery(sql, userId);
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод возвращает билеты, отсортированные по статусу.
+    // ascending = true — paid -> booked -> canceled
+    // ascending = false — canceled -> booked -> paid
+    @Override
+    public List<Ticket> findAllSortedByStatus(
+            int userId,
+            boolean ascending
+    ) throws SQLException {
+
+        // Выбор направления сортировки.
+        String sortDirection = ascending ? "ASC" : "DESC";
+
+        String sql = """
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.user_id = ?
+            ORDER BY
+                CASE t.status
+                    WHEN 'paid' THEN 1
+                    WHEN 'booked' THEN 2
+                    WHEN 'canceled' THEN 3
+                END
+            """ + sortDirection + """
+            ,
+                t.created_at DESC
+            """;
+
+        return executeTicketListQuery(sql, userId);
+    }
+
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод возвращает билеты, отсортированные по дате спектакля.
+    // По умолчанию — от недавних спектаклей к старым.
     @Override
     public List<Ticket> findAllSortedByDate(int userId)
             throws SQLException {
@@ -147,7 +225,7 @@ public class TicketRepositoryImpl implements TicketRepository {
         String sql = """
             SELECT t.id,
                    t.user_id,
-                   t.performance_id,
+                   p.title AS performance_title,
                    t.row_number,
                    t.seat_number,
                    t.status,
@@ -162,33 +240,134 @@ public class TicketRepositoryImpl implements TicketRepository {
         return executeTicketListQuery(sql, userId);
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод возвращает билеты, отсортированные по дате спектакля.
+    // ascending = true — от старых спектаклей к новым.
+    // ascending = false — от новых спектаклей к старым.
+    @Override
+    public List<Ticket> findAllSortedByDate(
+            int userId,
+            boolean ascending
+    ) throws SQLException {
+
+        // Выбор направления сортировки.
+        String sortDirection = ascending ? "ASC" : "DESC";
+
+        String sql = """
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.user_id = ?
+            ORDER BY p.performance_date
+            """ + sortDirection;
+
+        return executeTicketListQuery(sql, userId);
+    }
+
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод ищет билеты пользователя по названию спектакля.
+    @Override
+    public List<Ticket> findByPerformanceTitle(
+            int userId,
+            String performanceTitle
+    ) throws SQLException {
+
+        // LOWER — переводит текст в нижний регистр.
+        // LIKE — позволяет искать совпадение по части строки.
+        // % означает любое количество символов.
+        String sql = """
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.user_id = ?
+              AND LOWER(p.title) LIKE LOWER(?)
+            ORDER BY p.performance_date DESC
+            """;
+
+        List<Ticket> tickets = new ArrayList<>();
+
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
+        try (Connection connection = databaseManager.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            // В первый ? установить id пользователя
+            statement.setInt(1, userId);
+
+            // Во второй ? установить название спектакля.
+            // % позволяет искать не только полное название,
+            // но и часть названия.
+            statement.setString(
+                    2,
+                    "%" + performanceTitle + "%"
+            );
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+
+                // Добавление найденного билета в список.
+                while (resultSet.next()) {
+                    tickets.add(mapTicket(resultSet));
+                }
+            }
+        }
+
+        return tickets;
+    }
+
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public Optional<Ticket> findById(
             int id,
             int userId
     ) throws SQLException {
 
+        // ? — плейсхолдер
         String sql = """
-            SELECT id,
-                   user_id,
-                   performance_id,
-                   row_number,
-                   seat_number,
-                   status,
-                   created_at
-            FROM Ticket
-            WHERE id = ?
-              AND user_id = ?
+            SELECT t.id,
+                   t.user_id,
+                   p.title AS performance_title,
+                   t.row_number,
+                   t.seat_number,
+                   t.status,
+                   t.created_at
+            FROM Ticket t
+            JOIN Performance p
+                ON p.id = t.performance_id
+            WHERE t.id = ?
+              AND t.user_id = ?
             """;
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
+            // В первый ? установить значение id билета
             statement.setInt(1, id);
+
+            // Во второй ? установить id пользователя
             statement.setInt(2, userId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
+                // Существует ли билет
                 if (resultSet.next()) {
                     return Optional.of(mapTicket(resultSet));
                 }
@@ -198,6 +377,8 @@ public class TicketRepositoryImpl implements TicketRepository {
         return Optional.empty();
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public boolean updateStatus(
             int id,
@@ -205,6 +386,11 @@ public class TicketRepositoryImpl implements TicketRepository {
             TicketStatus newStatus
     ) throws SQLException {
 
+        // ? — плейсхолдер
+        // Разрешено:
+        // booked -> paid
+        // booked -> canceled
+        // paid -> canceled
         String sql = """
             UPDATE Ticket
             SET status = ?::ticket_status
@@ -217,6 +403,8 @@ public class TicketRepositoryImpl implements TicketRepository {
                   )
             """;
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
@@ -228,32 +416,44 @@ public class TicketRepositoryImpl implements TicketRepository {
             statement.setString(4, status);
             statement.setString(5, status);
 
+            // executeUpdate используется для INSERT, UPDATE, DELETE
+            // и возвращает количество изменённых строк
             return statement.executeUpdate() > 0;
         }
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public boolean deleteById(
             int id,
             int userId
     ) throws SQLException {
 
+        // ? — плейсхолдер
         String sql = """
             DELETE FROM Ticket
             WHERE id = ?
               AND user_id = ?
             """;
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
+            // Вставка в плейсхолдеры
             statement.setInt(1, id);
             statement.setInt(2, userId);
 
+            // executeUpdate используется для INSERT, UPDATE, DELETE
+            // и возвращает количество изменённых строк
             return statement.executeUpdate() > 0;
         }
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
     @Override
     public Ticket create(
             int userId,
@@ -262,6 +462,9 @@ public class TicketRepositoryImpl implements TicketRepository {
             int seatNumber
     ) throws SQLException {
 
+        // ? — плейсхолдеры
+        // performanceId нужен здесь для создания связи
+        // билета со спектаклем в таблице Ticket.
         String sql = """
             INSERT INTO Ticket (
                 user_id,
@@ -271,18 +474,15 @@ public class TicketRepositoryImpl implements TicketRepository {
                 status
             )
             VALUES (?, ?, ?, ?, 'booked')
-            RETURNING id,
-                      user_id,
-                      performance_id,
-                      row_number,
-                      seat_number,
-                      status,
-                      created_at
+            RETURNING id
             """;
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
+            // Вставка в плейсхолдеры
             statement.setInt(1, userId);
             statement.setInt(2, performanceId);
             statement.setInt(3, rowNumber);
@@ -290,13 +490,28 @@ public class TicketRepositoryImpl implements TicketRepository {
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
+                // Получение id только что созданного билета.
                 if (resultSet.next()) {
-                    return mapTicket(resultSet);
+
+                    int ticketId = resultSet.getInt("id");
+
+                    // После создания билета снова получаем его через findById.
+                    // Благодаря JOIN Performance результат будет содержать
+                    // название спектакля, а не performance_id.
+                    Optional<Ticket> ticket =
+                            findById(ticketId, userId);
+
+                    if (ticket.isPresent()) {
+                        return ticket.get();
+                    }
                 }
             }
 
+            // Обработка занятого места
         } catch (SQLException e) {
 
+            // Код 23505 — нарушение UNIQUE-ограничения PostgreSQL.
+            // В нашей БД это может произойти, если место уже занято.
             if ("23505".equals(e.getSQLState())) {
                 throw new SQLException(
                         "Это место уже занято",
@@ -310,10 +525,17 @@ public class TicketRepositoryImpl implements TicketRepository {
         throw new SQLException("Не удалось создать билет");
     }
 
+
+    // Аннотация @Override метод класса переопределяет метод интерфейса.
+    // Метод создаёт матрицу мест конкретного спектакля.
+    // 0 — место свободно.
+    // 1 — место занято.
     @Override
     public int[][] getSeats(int performanceId)
             throws SQLException {
 
+        // SQL-запрос получает занятые места конкретного спектакля.
+        // Берутся только забронированные и оплаченные билеты.
         String sql = """
             SELECT row_number,
                    seat_number
@@ -323,31 +545,49 @@ public class TicketRepositoryImpl implements TicketRepository {
             ORDER BY row_number, seat_number
             """;
 
+        // Создание матрицы зала.
+        // 15 — количество рядов.
+        // 20 — количество мест в каждом ряду.
         int[][] seats = new int[15][20];
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
+            // В первый ? установить id спектакля
             statement.setInt(1, performanceId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
+                // Переход по всем найденным занятым местам.
                 while (resultSet.next()) {
 
+                    // Получение номера ряда из БД.
                     int row =
                             resultSet.getInt("row_number");
 
+                    // Получение номера места из БД.
                     int seat =
                             resultSet.getInt("seat_number");
 
+                    // В Java массив начинается с индекса 0.
+                    // Поэтому из номера ряда и места вычитается 1.
+                    // 1 — занятое место.
                     seats[row - 1][seat - 1] = 1;
                 }
             }
         }
 
+        // Возвращение готовой матрицы мест.
         return seats;
     }
 
+
+    // Метод выполняет переданный SQL-запрос
+    // и преобразует найденные строки в список Ticket.
+    // Используется несколькими методами класса,
+    // чтобы не повторять одинаковый код подключения к БД.
     private List<Ticket> executeTicketListQuery(
             String sql,
             int userId
@@ -355,6 +595,8 @@ public class TicketRepositoryImpl implements TicketRepository {
 
         List<Ticket> tickets = new ArrayList<>();
 
+        // Connection устанавливает соединение с БД
+        // PreparedStatement — предварительно скомпилированный SQL-запрос
         try (Connection connection = databaseManager.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
@@ -362,6 +604,7 @@ public class TicketRepositoryImpl implements TicketRepository {
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
+                // Каждая строка становится Ticket
                 while (resultSet.next()) {
                     tickets.add(mapTicket(resultSet));
                 }
@@ -371,19 +614,32 @@ public class TicketRepositoryImpl implements TicketRepository {
         return tickets;
     }
 
+
+    // Метод создания из строки ResultSet объект Ticket
     private Ticket mapTicket(ResultSet resultSet)
             throws SQLException {
 
         Ticket ticket = new Ticket();
 
-        ticket.setId(resultSet.getInt("id"));
-        ticket.setUserId(resultSet.getInt("user_id"));
-        ticket.setPerformanceId(
-                resultSet.getInt("performance_id")
+        ticket.setId(
+                resultSet.getInt("id")
         );
+
+        ticket.setUserId(
+                resultSet.getInt("user_id")
+        );
+
+        // Получение названия спектакля.
+        // В SQL оно было получено через:
+        // p.title AS performance_title
+        ticket.setPerformanceTitle(
+                resultSet.getString("performance_title")
+        );
+
         ticket.setRowNumber(
                 resultSet.getInt("row_number")
         );
+
         ticket.setSeatNumber(
                 resultSet.getInt("seat_number")
         );
@@ -403,6 +659,9 @@ public class TicketRepositoryImpl implements TicketRepository {
         return ticket;
     }
 
+
+    // Метод преобразует Java enum TicketStatus
+    // в строку, которая используется в PostgreSQL.
     private String statusToDatabase(TicketStatus status) {
 
         return switch (status) {

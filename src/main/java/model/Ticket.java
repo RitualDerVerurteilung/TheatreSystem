@@ -10,7 +10,7 @@ public class Ticket {
 
     int id;
     int userId;
-    int performanceId;
+    String performanceTitle;
     int rowNumber;
     int seatNumber;
     TicketStatus status;
@@ -31,12 +31,8 @@ public class Ticket {
         return userId;
     }
 
-    public void setPerformanceId(int performanceId) {
-        this.performanceId = performanceId;
-    }
-    public int getPerformanceId() {
-        return performanceId;
-    }
+    public void setPerformanceTitle(String performanceTitle) { this.performanceTitle = performanceTitle; }
+    public String getPerformanceTitle() { return performanceTitle; }
 
     public void setRowNumber(int rowNumber) {
         this.rowNumber = rowNumber;
