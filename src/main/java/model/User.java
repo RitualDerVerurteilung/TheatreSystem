@@ -8,10 +8,10 @@ public class User {
     String passportData;
     String passwordHash;
 
+
     public void setId(int id) {
         this.id = id;
     }
-
     public int getId() {
         return id;
     }
@@ -19,7 +19,6 @@ public class User {
     public void setFirstName(String firstName) {
         this.firstName = firstName;
     }
-
     public String getFirstName() {
         return firstName;
     }
@@ -27,7 +26,6 @@ public class User {
     public void setLastName(String lastName) {
         this.lastName = lastName;
     }
-
     public String getLastName() {
         return lastName;
     }
@@ -35,7 +33,6 @@ public class User {
     public void setEmail(String email) {
         this.email = email;
     }
-
     public String getEmail() {
         return email;
     }
@@ -43,7 +40,6 @@ public class User {
     public void setPassportData(String passportData) {
         this.passportData = passportData;
     }
-
     public String getPassportData() {
         return passportData;
     }
