@@ -47,33 +47,13 @@ public class UserRepositoryImpl implements UserRepository {
             try (ResultSet resultSet = statement.executeQuery()) {
 
                 if (resultSet.next()) {
-
                     User createdUser = new User();
-
-                    createdUser.setId(
-                            resultSet.getInt("id")
-                    );
-
-                    createdUser.setFirstName(
-                            resultSet.getString("first_name")
-                    );
-
-                    createdUser.setLastName(
-                            resultSet.getString("last_name")
-                    );
-
-                    createdUser.setEmail(
-                            resultSet.getString("email")
-                    );
-
-                    createdUser.setPassportData(
-                            resultSet.getString("passport_data")
-                    );
-
-                    createdUser.setPasswordHash(
-                            resultSet.getString("password_hash")
-                    );
-
+                    createdUser.setId( resultSet.getInt("id"));
+                    createdUser.setFirstName(resultSet.getString("first_name"));
+                    createdUser.setLastName(resultSet.getString("last_name"));
+                    createdUser.setEmail(resultSet.getString("email"));
+                    createdUser.setPassportData(resultSet.getString("passport_data"));
+                    createdUser.setPasswordHash(resultSet.getString("password_hash"));
                     return createdUser;
                 }
             }
@@ -94,58 +74,28 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public Optional<User> findByEmail(String email)
-            throws SQLException {
+    public Optional<User> findByEmailAndPassword(String email, String password) {
+        String sql = "SELECT id, name, email, password, role FROM users WHERE email = ? AND password = ?";
 
-        String sql = """
-                SELECT id,
-                       first_name,
-                       last_name,
-                       email,
-                       passport_data,
-                       password_hash
-                FROM User_Theatre
-                WHERE email = ?
-                """;
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-        try (Connection connection = databaseManager.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+            stmt.setString(1, email);
+            stmt.setString(2, password);
 
-            statement.setString(1, email);
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-
-                if (resultSet.next()) {
-
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
                     User user = new User();
-
-                    user.setId(
-                            resultSet.getInt("id")
-                    );
-
-                    user.setFirstName(
-                            resultSet.getString("first_name")
-                    );
-
-                    user.setLastName(
-                            resultSet.getString("last_name")
-                    );
-
-                    user.setEmail(
-                            resultSet.getString("email")
-                    );
-
-                    user.setPassportData(
-                            resultSet.getString("passport_data")
-                    );
-
-                    user.setPasswordHash(
-                            resultSet.getString("password_hash")
-                    );
-
+                    user.setId(rs.getLong("id"));
+                    user.setName(rs.getString("name"));
+                    user.setEmail(rs.getString("email"));
+                    user.setPassword(rs.getString("password"));
+                    user.setRole(rs.getString("role"));
                     return Optional.of(user);
                 }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
         return Optional.empty();

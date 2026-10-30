@@ -5,6 +5,7 @@ import repository.implementation.UserRepositoryImpl;
 import service.TicketService;
 import service.UserService;
 import util.DatabaseManager;
+import util.DbConfig;
 import model.Performance;
 import model.Ticket;
 import repository.PerformanceRepository;
@@ -22,9 +23,9 @@ public class Program {
     public static void main(String[] args) {
 
         DatabaseManager databaseManager = new DatabaseManager(
-                "jdbc:postgresql://localhost:5432/Theatre",
-                "postgres",
-                "root"
+                DbConfig.url(),
+                DbConfig.user(),
+                DbConfig.password()
         );
 
         databaseManager.isConnected();
@@ -37,6 +38,12 @@ public class Program {
         try {
             UserService userService = new UserService(userRepository);
             User currentUser = userService.mainService();
+
+            if (currentUser == null) {
+                System.out.println("Авторизация не выполнена. Завершение работы.");
+                return;
+            }
+
             userId = currentUser.getId();
         } catch (SQLException e) {
             System.out.println("Возникла непредвиденная ошибка в процессе запроса к базе данных: " + e);
@@ -141,271 +148,3 @@ public class Program {
     }
 
 }
-//
-//import util.DatabaseManager;
-//import model.Performance;
-//import model.Ticket;
-//import repository.PerformanceRepository;
-//import repository.TicketRepository;
-//import repository.implementation.PerformanceRepositoryImpl;
-//import repository.implementation.TicketRepositoryImpl;
-//import util.Statistic;
-//
-//import java.util.List;
-//import java.sql.SQLException;
-//public class Program {
-//
-//    // Размеры зала: 15 рядов по 20 мест
-//    private static final int ROWS = 15;
-//    private static final int SEATS_PER_ROW = 20;
-//
-//    public static void main(String[] args) {
-//
-//        DatabaseManager databaseManager = new DatabaseManager(
-//                "jdbc:postgresql://localhost:5432/Theatre",
-//                "postgres",
-//                "root"
-//        );
-//
-//        System.out.println(
-//                "Подключение: " +
-//                        databaseManager.isConnected()
-//        );
-//
-//        try {
-//            PerformanceRepository performanceRepository =
-//                    new PerformanceRepositoryImpl(databaseManager);
-//
-//            TicketRepository ticketRepository =
-//                    new TicketRepositoryImpl(databaseManager);
-//
-//            // Спектакли
-//
-//            List<Performance> performances =
-//                    performanceRepository.findAll();
-//
-//            System.out.println("\nСпектакли по дате:");
-//
-//            for (Performance performance : performances) {
-//                System.out.println(
-//                        performance.getId()
-//                                + " | "
-//                                + performance.getTitle()
-//                                + " | "
-//                                + performance.getDate()
-//                                + " | "
-//                                + performance.getPrice()
-//                );
-//            }
-//
-//
-//            // Матрица мест
-//
-//            for (Performance performance : performances) {
-//
-//                int performanceId =
-//                        performance.getId();
-//
-//                // Получаем список занятых мест в виде пар {ряд, место}
-//                List<int[]> occupiedSeats =
-//                        performanceRepository.findOccupiedSeats(performanceId);
-//
-//                // Строим матрицу 0/1:
-//                // 0 — свободно, 1 — занято
-//                int[][] seats = new int[ROWS][SEATS_PER_ROW];
-//
-//                for (int[] occupiedSeat : occupiedSeats) {
-//
-//                    int row = occupiedSeat[0];
-//                    int seatNumber = occupiedSeat[1];
-//
-//                    // Проверка на корректность координат
-//                    seats[row - 1][seatNumber - 1] = 1;
-//                }
-//
-//                System.out.println(
-//                        "\nМатрица мест спектакля "
-//                                + performanceId
-//                                + " ("
-//                                + performance.getTitle()
-//                                + "):"
-//                );
-//
-//                // Заголовок с номерами мест
-//                System.out.print("       ");
-//
-//                for (int seat = 1; seat <= SEATS_PER_ROW; seat++) {
-//                    System.out.printf("%2d ", seat);
-//                }
-//
-//                System.out.println();
-//
-//                // Сама матрица
-//                for (int row = 0; row < ROWS; row++) {
-//
-//                    System.out.printf(
-//                            "Ряд %2d: ",
-//                            row + 1
-//                    );
-//
-//                    for (int seat = 0; seat < SEATS_PER_ROW; seat++) {
-//                        System.out.print(
-//                                seats[row][seat] + "  "
-//                        );
-//                    }
-//
-//                    System.out.println();
-//                }
-//            }
-//
-//
-//            // Билеты пользователя
-//
-//            // Для теста используется пользователь с id = 1.
-//            int userId = 1;
-//
-//            // Сортировка по статусу
-//            System.out.println(
-//                    "\nБилеты пользователя "
-//                            + userId
-//                            + " по статусу:"
-//            );
-//
-//            List<Ticket> ticketsByStatus =
-//                    ticketRepository.findAllSortedByStatus(userId);
-//
-//            printTickets(ticketsByStatus);
-//
-//
-//            System.out.println(
-//                    "\nБилеты по статусу в обратном порядке:"
-//            );
-//
-//            List<Ticket> ticketsByStatusReverse =
-//                    ticketRepository.findAllSortedByStatus(
-//                            userId,
-//                            false
-//                    );
-//
-//            printTickets(ticketsByStatusReverse);
-//
-//            // Сортировка по дате
-//            System.out.println(
-//                    "\nБилеты по дате спектакля "
-//                            + "(от новых к старым):"
-//            );
-//
-//            List<Ticket> ticketsByDate =
-//                    ticketRepository.findAllSortedByDate(userId);
-//
-//            printTickets(ticketsByDate);
-//
-//
-//            System.out.println(
-//                    "\nБилеты по дате спектакля "
-//                            + "(от старых к новым):"
-//            );
-//
-//            List<Ticket> ticketsByDateReverse =
-//                    ticketRepository.findAllSortedByDate(
-//                            userId,
-//                            true
-//                    );
-//
-//            printTickets(ticketsByDateReverse);
-//
-//
-//            // Поиск по названию
-//            String performanceTitle = "Гамлет";
-//
-//            System.out.println(
-//                    "\nПоиск билетов по названию спектакля: "
-//                            + performanceTitle
-//            );
-//
-//            List<Ticket> foundTickets =
-//                    ticketRepository.findByPerformanceTitle(
-//                            userId,
-//                            performanceTitle
-//                    );
-//
-//            printTickets(foundTickets);
-//
-//            // Билет по id
-//            int ticketId = 1;
-//
-//            System.out.println(
-//                    "\nПоиск билета по ID: "
-//                            + ticketId
-//            );
-//
-//            ticketRepository.findById(
-//                    ticketId,
-//                    userId
-//            ).ifPresentOrElse(
-//                    ticket -> printTicket(ticket),
-//                    () -> System.out.println(
-//                            "Билет не найден."
-//                    )
-//            );
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//
-//        Statistic statisticsService = new Statistic(databaseManager);
-//        try {
-//            statisticsService.printStatistics();
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//
-//    // Метод выводит список билетов.
-//    private static void printTickets(List<Ticket> tickets) {
-//
-//        if (tickets.isEmpty()) {
-//            System.out.println("Билетов нет.");
-//            return;
-//        }
-//
-//        for (Ticket ticket : tickets) {
-//
-//            System.out.println(
-//                    "ID: "
-//                            + ticket.getId()
-//                            + " | Спектакль: "
-//                            + ticket.getPerformanceTitle()
-//                            + " | Ряд: "
-//                            + ticket.getRowNumber()
-//                            + " | Место: "
-//                            + ticket.getSeatNumber()
-//                            + " | Статус: "
-//                            + ticket.getStatus()
-//                            + " | Создан: "
-//                            + ticket.getCreatedAt()
-//            );
-//        }
-//    }
-//
-//
-//    // Метод выводит один билет.
-//    private static void printTicket(Ticket ticket) {
-//
-//        System.out.println(
-//                "ID: "
-//                        + ticket.getId()
-//                        + " | Спектакль: "
-//                        + ticket.getPerformanceTitle()
-//                        + " | Ряд: "
-//                        + ticket.getRowNumber()
-//                        + " | Место: "
-//                        + ticket.getSeatNumber()
-//                        + " | Статус: "
-//                        + ticket.getStatus()
-//                        + " | Создан: "
-//                        + ticket.getCreatedAt()
-//        );
-//    }
-//}

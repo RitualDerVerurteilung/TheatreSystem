@@ -50,14 +50,3 @@ public class DatabaseManager {
         }
     }
 }
-
-// ======== ПОДКЛЮЧЕНИЕ К БД ========
-// import util.DatabaseManager;
-//
-// DatabaseManager databaseManager = new DatabaseManager(
-//     "jdbc:postgresql://localhost:5432/Theatre",
-//     "postgres",
-//     "password"
-// );
-//
-// System.out.println( "Подключение: " + databaseManager.isConnected() );
